@@ -1,4 +1,6 @@
 const pasienModel = require('../models/pasienModel');
+const bcrypt = require('bcryptjs');
+const supabase = require('../db');
 
 // Pendaftaran pasien
 const registerPasien = async (req, res) => {
@@ -24,6 +26,35 @@ const getPasien = async (req, res) => {
     res.ok(pasien);  // Menggunakan standar respons dengan kode 200 (OK)
   } catch (error) {
     res.error('Gagal mengambil data pasien', {}, 500);
+  }
+};
+
+const createStaff = async (req, res) => {
+  try {
+    const { nama, no_hp, password, role } = req.body;
+
+    // Validasi role yang boleh dibuat oleh admin
+    const allowed = ['petugas','admin'];
+    if (!allowed.includes(role)) {
+      return res.forbidden('Role tidak diperbolehkan');
+    }
+
+    const hashed = await bcrypt.hash(password, 10);
+    const { data, error } = await supabase
+      .from('users')
+      .insert({ nama, no_hp, password: hashed, role })
+      .select('id, nama, no_hp, role, created_at, updated_at')
+      .single();
+
+    if (error) {
+      if (error.code === '23505') return res.conflict('Nomor HP sudah terdaftar');
+      throw error;
+    }
+
+    return res.created(data);
+  } catch (e) {
+    console.log("err " + e);
+    return res.error('Gagal membuat akun petugas/admin');
   }
 };
 
@@ -96,7 +127,4 @@ const updatePasien = async (req, res) => {
   }
 };
 
-module.exports = { updatePasien };
-
-
-module.exports = { registerPasien, getPasien, getDetailPasien, deletePasien };
+module.exports = { createStaff, registerPasien, updatePasien, getPasien, getDetailPasien, deletePasien };
