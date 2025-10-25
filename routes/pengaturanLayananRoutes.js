@@ -15,4 +15,7 @@ router.put('/:poli_id/:hari_operasional', verifyToken, verifyRole(['admin', 'pet
 // Rute untuk menghapus pengaturan layanan berdasarkan poli dan hari operasional (akses hanya untuk admin atau petugas)
 router.delete('/:poli_id/:hari_operasional', verifyToken, verifyRole(['admin', 'petugas']), pengaturanLayananController.deletePengaturanLayanan);
 
+// Endpoint untuk mengambil jadwal aktif berdasarkan poli_id
+router.get('/jadwal/aktif/:poli_id', verifyToken, pengaturanLayananController.getJadwalAktif);
+
 module.exports = router;
