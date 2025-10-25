@@ -13,13 +13,14 @@ const createPoli = async (req, res) => {
     const { data, error } = await supabase
       .from('poli')
       .insert({ nama_poli })
+      .select()
       .single();
 
     if (error) {
       return res.error('Gagal menambahkan poli', {}, 500);
     }
 
-    res.created(data);
+    res.created({}, "Berhasil menambah poli");
   } catch (error) {
     res.error('Terjadi kesalahan saat menambahkan poli', {}, 500);
   }
