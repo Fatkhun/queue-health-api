@@ -21,13 +21,14 @@ const addPengaturanLayanan = async (req, res) => {
           kuota_harian
         }
       )
+      .select()
       .single();
 
     if (error) {
       return res.error('Gagal menambahkan pengaturan layanan', {}, 500);
     }
 
-    res.created(data);
+    res.created({}, "Berhasil menambah pengaturan layanan");
   } catch (error) {
     res.error('Terjadi kesalahan saat menambahkan pengaturan layanan', {}, 500);
   }
