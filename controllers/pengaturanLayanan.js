@@ -9,28 +9,57 @@ const addPengaturanLayanan = async (req, res) => {
   }
 
   try {
-    // Memasukkan pengaturan layanan ke tabel pengaturan_layanan
-    const { data, error } = await supabase
+    // Mengecek apakah poli_id sudah ada di pengaturan_layanan
+    const { data: existingData, error: fetchError } = await supabase
       .from('pengaturan_layanan')
-      .insert(
-        {
-          poli_id,
-          hari_operasional,  // Menyimpan hari_operasional sebagai array
+      .select('*')
+      .eq('poli_id', poli_id)
+      .single();
+
+    if (fetchError) {
+      return res.error('Gagal memeriksa data pengaturan layanan', {}, 500);
+    }
+
+    if (existingData) {
+      // Jika data sudah ada, lakukan update
+      const { data, error } = await supabase
+        .from('pengaturan_layanan')
+        .update({
+          hari_operasional,
           jam_operasional_start,
           jam_operasional_end,
           kuota_harian
-        }
-      )
-      .select()
-      .single();
+        })
+        .eq('poli_id', poli_id)
+        .single();
 
-    if (error) {
-      return res.error('Gagal menambahkan pengaturan layanan', {}, 500);
+      if (error) {
+        return res.error('Gagal memperbarui pengaturan layanan', {}, 500);
+      }
+
+      return res.ok({}, "Berhasil memperbarui pengaturan layanan");
+    } else {
+      // Jika data belum ada, lakukan insert
+      const { data, error } = await supabase
+        .from('pengaturan_layanan')
+        .insert({
+          poli_id,
+          hari_operasional,
+          jam_operasional_start,
+          jam_operasional_end,
+          kuota_harian
+        })
+        .select()
+        .single();
+
+      if (error) {
+        return res.error('Gagal menambahkan pengaturan layanan', {}, 500);
+      }
+
+      return res.created({}, "Berhasil menambah pengaturan layanan");
     }
-
-    res.created({}, "Berhasil menambah pengaturan layanan");
   } catch (error) {
-    res.error('Terjadi kesalahan saat menambahkan pengaturan layanan', {}, 500);
+    return res.error('Terjadi kesalahan saat menambahkan atau memperbarui pengaturan layanan', {}, 500);
   }
 };
 

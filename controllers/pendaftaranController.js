@@ -41,8 +41,10 @@ const createPendaftaran = async (req, res) => {
     .from('pengaturan_layanan')
     .select('*')
     .eq('poli_id', poli_id)
+    .limit(1)
     .single();
 
+  console.log("data " + JSON.stringify(pengaturanError))
   if (pengaturanError || !pengaturanLayanan) {
     return res.notFound('Pengaturan layanan poli tidak ditemukan');
   }
@@ -59,7 +61,12 @@ const createPendaftaran = async (req, res) => {
   const jamOperasionalEnd = new Date(`1970-01-01T${pengaturanLayanan.jam_operasional_end}Z`);
   const jadwalTime = new Date(`1970-01-01T${jadwal.split('T')[1]}Z`);
 
-  if (jadwalTime < jamOperasionalStart || jadwalTime > jamOperasionalEnd) {
+  // Konversi waktu ke format 24 jam
+  const startMinutes = jamOperasionalStart.getHours() * 60 + jamOperasionalStart.getMinutes();  // Waktu mulai dalam menit
+  const endMinutes = jamOperasionalEnd.getHours() * 60 + jamOperasionalEnd.getMinutes();  // Waktu selesai dalam menit
+  const jadwalMinutes = jadwalTime.getHours() * 60 + jadwalTime.getMinutes();  // Waktu jadwal dalam menit
+
+  if (jadwalMinutes < startMinutes || jadwalMinutes > endMinutes) {
     return res.badRequest('Waktu yang dipilih tidak sesuai dengan jam operasional poli');
   }
 
@@ -145,8 +152,6 @@ const createPendaftaran = async (req, res) => {
     res.error('Terjadi kesalahan saat menambah pendaftaran online dan antrean', {}, 500);
   }
 };
-
-
 
 
 // Mengambil pendaftaran online pasien berdasarkan ID

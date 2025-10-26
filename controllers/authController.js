@@ -5,7 +5,7 @@ const supabase = require('../db');
 
 // Function to generate JWT token
 const generateToken = (user) => {
-  return jwt.sign(user, secretKey, { expiresIn: '12h' });
+  return jwt.sign(user, secretKey, { expiresIn: '7d' });
 };
 
 // Login untuk petugas, pasien, dan super admin
