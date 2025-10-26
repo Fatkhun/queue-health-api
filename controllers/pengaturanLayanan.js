@@ -126,8 +126,6 @@ const getJadwalAktif = async (req, res) => {
       return res.error('Gagal mengambil pengaturan layanan', {}, 500);
     }
 
-    //console.log("data " + pengaturanLayanan)
-
     // Jika tidak ada pengaturan layanan ditemukan
     if (!pengaturanLayanan || pengaturanLayanan.length === 0) {
       return res.notFound('Pengaturan layanan tidak ditemukan untuk poli ini');
@@ -138,17 +136,25 @@ const getJadwalAktif = async (req, res) => {
     const dayOfWeek = today.toLocaleString('id-ID', { weekday: 'long', timeZone: 'Asia/Jakarta' }).toLowerCase();  // Nama hari dalam bahasa Indonesia
     const currentTime = today.getHours() * 60 + today.getMinutes();  // Menyimpan waktu saat ini dalam menit (jam * 60 + menit)
 
+    console.log("hari " + dayOfWeek);
+
     // Filter untuk mendapatkan hari operasional yang aktif sesuai dengan hari ini
     const aktifLayanan = pengaturanLayanan.filter(item => {
       const hariOperasional = item.hari_operasional.map(hari => hari.toLowerCase());
       if (hariOperasional.includes(dayOfWeek)) {
         // Cek apakah waktu sekarang ada dalam jam operasional
-        const jamStart = new Date(`1970-01-01T${item.jam_operasional_start}Z`);
-        const jamEnd = new Date(`1970-01-01T${item.jam_operasional_end}Z`);
-        const startMinutes = jamStart.getHours() * 60 + jamStart.getMinutes(); // Waktu dalam menit
-        const endMinutes = jamEnd.getHours() * 60 + jamEnd.getMinutes(); // Waktu dalam menit
+        const jamStart = item.jam_operasional_start.split(':');
+        const jamEnd = item.jam_operasional_end.split(':');
 
-        return currentTime >= startMinutes && currentTime <= endMinutes;  // Cek apakah sekarang dalam jam operasional
+        // Mengonversi jam mulai dan jam selesai ke menit
+        const startMinutes = parseInt(jamStart[0]) * 60 + parseInt(jamStart[1]); // Waktu mulai dalam menit
+        const endMinutes = parseInt(jamEnd[0]) * 60 + parseInt(jamEnd[1]); // Waktu selesai dalam menit
+
+        console.log("today " + today + " poli start " + startMinutes);
+        console.log("curr " + currentTime + " start poli " + startMinutes + " end poli " + endMinutes);
+
+        // Cek apakah waktu sekarang dalam rentang jam operasional
+        return currentTime >= startMinutes && currentTime <= endMinutes;
       }
       return false;
     });
@@ -160,6 +166,7 @@ const getJadwalAktif = async (req, res) => {
     res.error('Terjadi kesalahan saat mengambil jadwal aktif', {}, 500);
   }
 };
+
 
 
 module.exports = { addPengaturanLayanan, getPengaturanLayanan, updatePengaturanLayanan, deletePengaturanLayanan, getJadwalAktif };
