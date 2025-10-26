@@ -1,21 +1,20 @@
 const supabase = require('../db');
+const moment = require('moment-timezone');
+moment.locale('id');
 
 // Menambah pendaftaran online pasien beserta antrean
 const createPendaftaran = async (req, res) => {
   const { poli_id, pasien_id, jadwal, keluhan, tanggal_daftar } = req.body;
 
   // Mengambil waktu lokal Indonesia (WIB)
-  const localTime = new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' });
-  const today = new Date(localTime);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(today.getDate() + 1);  // Mengatur tanggal besok
+  const today = moment().tz('Asia/Jakarta');  // Menggunakan Moment.js dengan zona waktu Asia/Jakarta
+  const tomorrow = today.clone().add(1, 'days');  // Mengatur tanggal besok
 
-  // Format tanggal agar sama dengan format yang digunakan di database
-  const todayFormatted = today.toISOString().split('T')[0]; // 'YYYY-MM-DD'
-  const tomorrowFormatted = tomorrow.toISOString().split('T')[0]; // 'YYYY-MM-DD'
+  const todayFormatted = today.format('YYYY-MM-DD'); // 'YYYY-MM-DD'
+  const tomorrowFormatted = tomorrow.format('YYYY-MM-DD'); // 'YYYY-MM-DD'
 
   // Validasi apakah tanggal_daftar yang dipilih adalah hari ini atau besok
-  const selectedDate = tanggal_daftar.split('T')[0];  // Ambil tanggal dari tanggal_daftar (YYYY-MM-DD)
+  const selectedDate = moment(tanggal_daftar).format('YYYY-MM-DD');  // Ambil tanggal dari tanggal_daftar (YYYY-MM-DD)
 
   if (selectedDate !== todayFormatted && selectedDate !== tomorrowFormatted) {
     return res.badRequest('Pasien hanya bisa mendaftar untuk hari ini atau besok');
@@ -27,16 +26,15 @@ const createPendaftaran = async (req, res) => {
   }
 
   // Validasi format tanggal jadwal (misalnya, harus dalam format ISO 8601)
-  const jadwalDate = new Date(jadwal);
-  if (isNaN(jadwalDate)) {
+  const jadwalDate = moment(jadwal);
+  if (!jadwalDate.isValid()) {
     return res.badRequest('Format jadwal tidak valid');
   }
 
   // Mengambil waktu lokal Indonesia (WIB) untuk validasi jadwal
-  const jadwalLocal = new Date(jadwal).toLocaleString('en-US', { timeZone: 'Asia/Jakarta' });
-  const jadwalParsed = new Date(jadwalLocal);
+  const jadwalParsed = moment(jadwal).tz('Asia/Jakarta');  // Mengonversi jadwal ke WIB
 
-  // Validasi apakah waktu yang dipilih pasien sesuai dengan jam operasional poli
+  // Mengambil data pengaturan layanan dari database
   const { data: pengaturanLayanan, error: pengaturanError } = await supabase
     .from('pengaturan_layanan')
     .select('*')
@@ -44,27 +42,28 @@ const createPendaftaran = async (req, res) => {
     .limit(1)
     .single();
 
-  console.log("data " + JSON.stringify(pengaturanError))
   if (pengaturanError || !pengaturanLayanan) {
     return res.notFound('Pengaturan layanan poli tidak ditemukan');
   }
 
   // Validasi apakah hari yang dipilih pasien sesuai dengan hari operasional
-  const jadwalDay = jadwalParsed.toLocaleString('id-ID', { weekday: 'long', timeZone: 'Asia/Jakarta' }).toLowerCase();  
-  console.log("compare hari " + jadwalDay + " " + pengaturanLayanan.hari_operasional);
+  const jadwalDay = jadwalParsed.format('dddd').toLowerCase();  // Mengambil nama hari dalam format bahasa Indonesia (misal: "senin")
   if (!pengaturanLayanan.hari_operasional.map(day => day.toLowerCase()).includes(jadwalDay)) {
+    console.log("hari " + pengaturanLayanan.hari_operasional + " jadwal day " + jadwalDay);
     return res.badRequest('Jadwal yang dipilih tidak sesuai dengan hari operasional poli');
   }
 
-  // Validasi apakah waktu yang dipilih sesuai dengan jam operasional
-  const jamOperasionalStart = new Date(`1970-01-01T${pengaturanLayanan.jam_operasional_start}Z`);
-  const jamOperasionalEnd = new Date(`1970-01-01T${pengaturanLayanan.jam_operasional_end}Z`);
-  const jadwalTime = new Date(`1970-01-01T${jadwal.split('T')[1]}Z`);
+  // Validasi apakah waktu yang dipilih pasien sesuai dengan jam operasional
+  const jamOperasionalStart = moment(`1970-01-01T${pengaturanLayanan.jam_operasional_start}`).tz('Asia/Jakarta');
+  const jamOperasionalEnd = moment(`1970-01-01T${pengaturanLayanan.jam_operasional_end}`).tz('Asia/Jakarta');
 
-  // Konversi waktu ke format 24 jam
-  const startMinutes = jamOperasionalStart.getHours() * 60 + jamOperasionalStart.getMinutes();  // Waktu mulai dalam menit
-  const endMinutes = jamOperasionalEnd.getHours() * 60 + jamOperasionalEnd.getMinutes();  // Waktu selesai dalam menit
-  const jadwalMinutes = jadwalTime.getHours() * 60 + jadwalTime.getMinutes();  // Waktu jadwal dalam menit
+  // Konversi jadwal pasien ke waktu lokal Indonesia (WIB)
+  const jadwalTime = moment(jadwal).tz('Asia/Jakarta');
+
+  // Perbandingan waktu dalam format 24 jam
+  const startMinutes = jamOperasionalStart.hours() * 60 + jamOperasionalStart.minutes();  // Waktu mulai dalam menit
+  const endMinutes = jamOperasionalEnd.hours() * 60 + jamOperasionalEnd.minutes();  // Waktu selesai dalam menit
+  const jadwalMinutes = jadwalTime.hours() * 60 + jadwalTime.minutes();  // Waktu jadwal dalam menit
 
   if (jadwalMinutes < startMinutes || jadwalMinutes > endMinutes) {
     return res.badRequest('Waktu yang dipilih tidak sesuai dengan jam operasional poli');
@@ -85,7 +84,6 @@ const createPendaftaran = async (req, res) => {
       )
       .select()
       .single();
-
 
     if (pendaftaranError) {
       return res.error('Gagal menambahkan pendaftaran online', {}, 500);
@@ -152,6 +150,9 @@ const createPendaftaran = async (req, res) => {
     res.error('Terjadi kesalahan saat menambah pendaftaran online dan antrean', {}, 500);
   }
 };
+
+
+
 
 
 // Mengambil pendaftaran online pasien berdasarkan ID
